@@ -1,3 +1,4 @@
+import uuid
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from typing import List, Optional
@@ -119,6 +120,20 @@ class CreatePurchaseOrderRequest(BaseModel):
     unit_cost: float
     expected_delivery_date: str
     notes: Optional[str] = None
+
+class Task(BaseModel):
+    id: str
+    title: str
+    priority: str
+    dueDate: str
+    status: str
+
+class CreateTaskRequest(BaseModel):
+    title: str
+    priority: str
+    dueDate: str
+
+tasks: List[dict] = []
 
 # API endpoints
 @app.get("/")
@@ -303,6 +318,38 @@ def get_monthly_trends():
     result = list(months.values())
     result.sort(key=lambda x: x['month'])
     return result
+
+@app.get("/api/tasks", response_model=List[Task])
+def get_tasks():
+    return tasks
+
+@app.post("/api/tasks", response_model=Task)
+def create_task(req: CreateTaskRequest):
+    task = {
+        "id": str(uuid.uuid4()),
+        "title": req.title,
+        "priority": req.priority,
+        "dueDate": req.dueDate,
+        "status": "pending",
+    }
+    tasks.append(task)
+    return task
+
+@app.delete("/api/tasks/{task_id}")
+def delete_task(task_id: str):
+    for i, t in enumerate(tasks):
+        if t["id"] == task_id:
+            tasks.pop(i)
+            return {"ok": True}
+    raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
+
+@app.patch("/api/tasks/{task_id}", response_model=Task)
+def toggle_task(task_id: str):
+    for t in tasks:
+        if t["id"] == task_id:
+            t["status"] = "completed" if t["status"] == "pending" else "pending"
+            return t
+    raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
 
 if __name__ == "__main__":
     import uvicorn
